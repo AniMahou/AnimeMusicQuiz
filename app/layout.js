@@ -1,20 +1,24 @@
-// This imports the global CSS file (styles apply everywhere)
-import "./globals.css";
+// app/layout.js
+// Root layout - wraps all pages
 
-// Metadata exports control what appears in browser tabs and SEO
+import "./globals.css"
+import AuthProvider from "@/components/AuthProvider"
+import Navbar from "@/components/Navbar"
+
 export const metadata = {
-  title: "Anime Music Quiz",     // Browser tab title
-  description: "Guess anime songs with friends!", // SEO description
-};
+  title: "Anime Music Quiz",
+  description: "Guess anime songs with friends!",
+}
 
-// RootLayout wraps EVERY page in your app
-// The {children} prop is whatever page is being rendered
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>
-        {children}  {/* This is where page.js content goes */}
+      <body className="bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 min-h-screen">
+        <AuthProvider>
+          <Navbar />
+          {children}
+        </AuthProvider>
       </body>
     </html>
-  );
+  )
 }
