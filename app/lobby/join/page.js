@@ -10,6 +10,7 @@ import { useSession } from 'next-auth/react';
 export default function JoinLobbyPage() {
   const { status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');

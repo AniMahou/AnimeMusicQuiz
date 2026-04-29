@@ -27,17 +27,16 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    // IMPORTANT: Check if user profile exists, create if not
-    let { data: userProfile, error: profileCheck } = await supabase
+    console.log('Creating lobby for user:', session.user.id);
+    
+    // Ensure user profile exists
+    const { data: existingProfile } = await supabase
       .from('user_profiles')
       .select('id')
       .eq('id', session.user.id)
-      .single();
+      .maybeSingle();
     
-    // If profile doesn't exist, create it now
-    if (!userProfile) {
-      console.log('Creating missing profile for user:', session.user.id);
-      
+    if (!existingProfile) {
       const { error: createProfileError } = await supabase
         .from('user_profiles')
         .insert({
@@ -50,9 +49,7 @@ export async function POST(request) {
       
       if (createProfileError) {
         console.error('Failed to create profile:', createProfileError);
-        return NextResponse.json({ 
-          error: 'User profile not found and could not be created. Please log out and log in again.' 
-        }, { status: 400 });
+        return NextResponse.json({ error: 'Failed to create user profile' }, { status: 400 });
       }
     }
     
@@ -68,7 +65,7 @@ export async function POST(request) {
         .from('lobbies')
         .select('code')
         .eq('code', code)
-        .single();
+        .maybeSingle();
       
       if (!existing) {
         isUnique = true;
@@ -78,17 +75,17 @@ export async function POST(request) {
       attempts++;
     }
     
+    console.log('Creating lobby with code:', code);
+    
     // Create lobby
-    const { data: lobby, error: lobbyError } = await supabase
+    const { error: lobbyError } = await supabase
       .from('lobbies')
       .insert({
         code: code,
         owner_id: session.user.id,
         settings: { rounds, timePerRound },
         status: 'waiting',
-      })
-      .select()
-      .single();
+      });
     
     if (lobbyError) {
       console.error('Lobby creation error:', lobbyError);
@@ -96,7 +93,7 @@ export async function POST(request) {
     }
     
     // Add owner as player
-    await supabase
+    const { error: playerError } = await supabase
       .from('lobby_players')
       .insert({
         lobby_code: code,
@@ -104,7 +101,17 @@ export async function POST(request) {
         score: 0,
       });
     
-    return NextResponse.json({ success: true, code: code });
+    if (playerError) {
+      console.error('Player addition error:', playerError);
+    }
+    
+    console.log('Lobby created successfully:', code);
+    
+    // Return just the code
+    return NextResponse.json({ 
+      success: true, 
+      code: code
+    });
     
   } catch (error) {
     console.error('Create lobby error:', error);
