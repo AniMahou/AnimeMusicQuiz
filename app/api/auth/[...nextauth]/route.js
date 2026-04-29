@@ -62,62 +62,69 @@ export const authOptions = {
     }),
     
     // MyAnimeList Provider
-    {
-      id: "mal",
-      name: "MyAnimeList",
-      type: "oauth",
-      wellKnown: "https://myanimelist.net/.well-known/oauth-authorization-server",
-      authorization: {
-        url: "https://myanimelist.net/v1/oauth2/authorize",
-        params: {
-          response_type: "code",
-          scope: "read"
-        }
-      },
-      token: {
-        url: "https://myanimelist.net/v1/oauth2/token",
-        async request(context) {
-          const { provider, params } = context;
-          const response = await fetch(provider.token.url, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              client_id: provider.clientId,
-              client_secret: provider.clientSecret,
-              code: params.code,
-              grant_type: "authorization_code",
-              redirect_uri: provider.callbackUrl,
-            }),
-          });
-          const data = await response.json();
-          return { tokens: data };
-        }
-      },
-      userinfo: {
-        url: "https://api.myanimelist.net/v2/users/@me",
-        async request(context) {
-          const response = await fetch("https://api.myanimelist.net/v2/users/@me?fields=id,name,picture", {
-            headers: {
-              Authorization: `Bearer ${context.tokens.access_token}`,
-            },
-          });
-          const data = await response.json();
-          return data;
-        }
-      },
-      clientId: process.env.MAL_CLIENT_ID,
-      clientSecret: process.env.MAL_CLIENT_SECRET,
-      async profile(profile) {
-        return {
-          id: profile.id.toString(),
-          name: profile.name,
-          email: `${profile.name}@mal-user.local`,
-          image: profile.picture?.medium,
-        };
+    // MyAnimeList Provider - WORKING VERSION
+    // MyAnimeList Provider - PKCE FIXED VERSION
+{
+    id: "mal",
+    name: "MyAnimeList",
+    type: "oauth",
+    version: "2.0",
+    checks: ["pkce", "state"], // ✅ Explicitly enable PKCE and State
+    authorization: {
+      url: "https://myanimelist.net/v1/oauth2/authorize",
+      params: {
+        scope: "read",
+        response_type: "code",
       },
     },
+    token: {
+      url: "https://myanimelist.net/v1/oauth2/token",
+      async request({ provider, params, client }) {
+        // PKCE code_verifier is automatically generated and passed in params
+        const response = await fetch(provider.token.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            client_id: provider.clientId,
+            client_secret: provider.clientSecret,
+            code: params.code,
+            code_verifier: params.code_verifier, // ✅ Required for PKCE
+            grant_type: "authorization_code",
+            redirect_uri: provider.callbackUrl,
+          }),
+        });
+        const tokens = await response.json();
+        if (!response.ok) throw tokens;
+        return { tokens };
+      },
+    },
+    userinfo: {
+      url: "https://api.myanimelist.net/v2/users/@me?fields=id,name,picture",
+      async request({ tokens }) {
+        const response = await fetch("https://api.myanimelist.net/v2/users/@me?fields=id,name,picture", {
+          headers: {
+            Authorization: `Bearer ${tokens.access_token}`,
+          },
+        });
+        const data = await response.json();
+        if (!response.ok) throw data;
+        return data;
+      },
+    },
+    clientId: process.env.MAL_CLIENT_ID,
+    clientSecret: process.env.MAL_CLIENT_SECRET,
+    callbackUrl: `${process.env.NEXTAUTH_URL}/api/auth/callback/mal`,
+    async profile(profile) {
+      return {
+        id: profile.id.toString(),
+        name: profile.name,
+        email: `${profile.id}@mal.user`,
+        image: profile.picture,
+      };
+    },
+  },
   ],
   
   pages: {
