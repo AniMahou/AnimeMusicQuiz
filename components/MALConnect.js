@@ -16,17 +16,15 @@ export default function MALConnect() {
   
   const handleConnect = async () => {
     setLoading(true);
-    setSyncStatus('');
-    
     try {
-      await signIn('mal');
+      window.location.href = '/api/auth/mal';  // This is the new route
     } catch (error) {
       console.error('MAL connection error:', error);
       setSyncStatus('Failed to connect MAL');
-    } finally {
       setLoading(false);
     }
   };
+  
   
   const handleSync = async () => {
     setLoading(true);

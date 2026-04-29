@@ -61,45 +61,67 @@ export const authOptions = {
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
     }),
     
-    // MyAnimeList Provider
-    // MyAnimeList Provider - WORKING VERSION
-    // MyAnimeList Provider - PKCE FIXED VERSION
+
+    // MyAnimeList Provider - WORKING PKCE
 {
     id: "mal",
     name: "MyAnimeList",
     type: "oauth",
     version: "2.0",
-    checks: ["pkce", "state"], // ✅ Explicitly enable PKCE and State
+    checks: ["pkce", "state"],
+    
     authorization: {
       url: "https://myanimelist.net/v1/oauth2/authorize",
       params: {
         scope: "read",
-        response_type: "code",
       },
     },
+    
     token: {
       url: "https://myanimelist.net/v1/oauth2/token",
-      async request({ provider, params, client }) {
-        // PKCE code_verifier is automatically generated and passed in params
-        const response = await fetch(provider.token.url, {
+      async request({ provider, params, client, checks }) {
+        // Get the code_verifier from the checks object
+        const codeVerifier = checks?.code_verifier;
+        
+        console.log("=== TOKEN REQUEST ===");
+        console.log("Has codeVerifier:", !!codeVerifier);
+        
+        const body = new URLSearchParams({
+          client_id: provider.clientId,
+          client_secret: provider.clientSecret,
+          code: params.code,
+          grant_type: "authorization_code",
+          redirect_uri: "http://localhost:3000/api/auth/callback/mal",
+        });
+        
+        // Add code_verifier if we have one
+        if (codeVerifier) {
+          body.append("code_verifier", codeVerifier);
+          console.log("Added code_verifier to request");
+        } else {
+          console.log("WARNING: No code_verifier available");
+        }
+        
+        const response = await fetch("https://myanimelist.net/v1/oauth2/token", {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
           },
-          body: new URLSearchParams({
-            client_id: provider.clientId,
-            client_secret: provider.clientSecret,
-            code: params.code,
-            code_verifier: params.code_verifier, // ✅ Required for PKCE
-            grant_type: "authorization_code",
-            redirect_uri: provider.callbackUrl,
-          }),
+          body: body,
         });
-        const tokens = await response.json();
-        if (!response.ok) throw tokens;
-        return { tokens };
+        
+        const data = await response.json();
+        console.log("Token response status:", response.status);
+        console.log("Token response:", data);
+        
+        if (!response.ok) {
+          throw new Error(data.error_description || data.message || "Token exchange failed");
+        }
+        
+        return { tokens: data };
       },
     },
+    
     userinfo: {
       url: "https://api.myanimelist.net/v2/users/@me?fields=id,name,picture",
       async request({ tokens }) {
@@ -108,19 +130,27 @@ export const authOptions = {
             Authorization: `Bearer ${tokens.access_token}`,
           },
         });
+        
         const data = await response.json();
-        if (!response.ok) throw data;
+        console.log("Userinfo response status:", response.status);
+        
+        if (!response.ok) {
+          throw new Error(data.message || "Failed to fetch user info");
+        }
+        
         return data;
       },
     },
+    
     clientId: process.env.MAL_CLIENT_ID,
     clientSecret: process.env.MAL_CLIENT_SECRET,
-    callbackUrl: `${process.env.NEXTAUTH_URL}/api/auth/callback/mal`,
+    
     async profile(profile) {
+      console.log("Profile received:", profile);
       return {
-        id: profile.id.toString(),
+        id: String(profile.id),
         name: profile.name,
-        email: `${profile.id}@mal.user`,
+        email: `${profile.id}@myanimelist.net`,
         image: profile.picture,
       };
     },
