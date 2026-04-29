@@ -1,5 +1,5 @@
 // app/api/auth/[...nextauth]/route.js
-// Complete authentication with Google and Facebook
+// Complete authentication with Email, Google, Facebook, and MyAnimeList
 
 import NextAuth from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
@@ -11,7 +11,7 @@ export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   
   providers: [
-    // Email/Password Provider
+    // 1. Email/Password Provider
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -43,11 +43,10 @@ export const authOptions = {
       }
     }),
     
-    // Google Provider
+    // 2. Google Provider
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      // Request these scopes from Google
       authorization: {
         params: {
           prompt: "consent",
@@ -58,17 +57,40 @@ export const authOptions = {
       }
     }),
     
-    // Facebook Provider
+    // 3. Facebook Provider
     FacebookProvider({
       clientId: process.env.FACEBOOK_CLIENT_ID,
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
-      // Request email permission
       authorization: {
         params: {
           scope: "email public_profile"
         }
       }
-    })
+    }),
+    
+    // 4. MyAnimeList Custom Provider
+    {
+      id: "mal",
+      name: "MyAnimeList",
+      type: "oauth",
+      version: "2.0",
+      scope: "read",
+      params: { grant_type: "authorization_code" },
+      accessTokenUrl: "https://myanimelist.net/v1/oauth2/token",
+      authorizationUrl: "https://myanimelist.net/v1/oauth2/authorize?response_type=code",
+      profileUrl: "https://api.myanimelist.net/v2/users/@me?fields=id,name,picture",
+      clientId: process.env.MAL_CLIENT_ID,
+      clientSecret: process.env.MAL_CLIENT_SECRET,
+      
+      async profile(profile) {
+        return {
+          id: profile.id.toString(),
+          name: profile.name,
+          email: `${profile.name}@mal-user.local`,
+          image: profile.picture?.medium,
+        }
+      }
+    }
   ],
   
   pages: {
@@ -85,17 +107,22 @@ export const authOptions = {
   callbacks: {
     // Called when JWT is created or updated
     async jwt({ token, user, account }) {
-      // Add user ID to token when user first logs in
       if (user) {
         token.id = user.id
         token.email = user.email
         token.name = user.name
       }
       
-      // Store provider info (for OAuth users)
       if (account) {
         token.provider = account.provider
         token.providerAccountId = account.providerAccountId
+        
+        // Store MAL tokens if available
+        if (account.provider === "mal") {
+          token.malAccessToken = account.access_token
+          token.malRefreshToken = account.refresh_token
+          token.malExpiresAt = account.expires_at
+        }
       }
       
       return token
@@ -103,16 +130,21 @@ export const authOptions = {
     
     // Called when session is accessed
     async session({ session, token }) {
-      // Add user ID to session object
       if (token && session.user) {
         session.user.id = token.id
         session.user.email = token.email
         session.user.name = token.name
+        
+        // Add MAL tokens to session if they exist
+        if (token.malAccessToken) {
+          session.user.malAccessToken = token.malAccessToken
+          session.user.malRefreshToken = token.malRefreshToken
+        }
       }
       return session
     },
     
-    // Called right after sign in - creates user profile in our database
+    // Called right after sign in - creates user profile in database
     async signIn({ user, account, profile }) {
       if (!user?.id) return false
       
@@ -126,7 +158,6 @@ export const authOptions = {
         
         // If not, create it
         if (!existing) {
-          // Get the best username available
           let username = null
           
           if (profile?.email) {
@@ -141,29 +172,49 @@ export const authOptions = {
             username = `user_${Math.random().toString(36).substring(2, 8)}`
           }
           
-          // Insert the user profile
+          // Store MAL tokens if this is MAL login
+          const malToken = account?.provider === "mal" ? account.access_token : null
+          const malRefreshToken = account?.provider === "mal" ? account.refresh_token : null
+          const malUsername = profile?.name || null
+          
           const { error: insertError } = await supabaseAdmin
             .from("user_profiles")
             .insert({
               id: user.id,
               email: user.email,
               username: username,
+              mal_token: malToken,
+              mal_refresh_token: malRefreshToken,
+              mal_username: malUsername,
               created_at: new Date().toISOString(),
             })
           
           if (insertError) {
             console.error("Error creating user profile:", insertError)
-            // Don't block sign in if profile creation fails
           } else {
             console.log("Created user profile for:", user.email)
+          }
+        } else if (account?.provider === "mal") {
+          // Update MAL tokens for existing user
+          const { error: updateError } = await supabaseAdmin
+            .from("user_profiles")
+            .update({
+              mal_token: account.access_token,
+              mal_refresh_token: account.refresh_token,
+              mal_username: profile?.name,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", user.id)
+          
+          if (updateError) {
+            console.error("Error updating MAL tokens:", updateError)
           }
         }
       } catch (error) {
         console.error("Error in signIn callback:", error)
-        // Don't block sign in
       }
       
-      return true // Allow sign in
+      return true
     }
   },
   

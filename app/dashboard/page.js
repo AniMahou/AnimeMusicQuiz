@@ -1,10 +1,10 @@
 // app/dashboard/page.js
 // Protected dashboard - only visible to logged-in users
-// If not logged in, middleware redirects to login
 
 import { getServerAuthSession } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import LogoutButton from '@/components/LogoutButton';
+import MALConnect from '@/components/MALConnect';
 
 export const metadata = {
   title: 'Dashboard - Anime Music Quiz',
@@ -12,11 +12,8 @@ export const metadata = {
 };
 
 export default async function DashboardPage() {
-  // Get session on the server
   const session = await getServerAuthSession();
   
-  // This shouldn't happen because middleware protects it,
-  // but it's good practice to check anyway
   if (!session) {
     redirect('/login');
   }
@@ -47,6 +44,11 @@ export default async function DashboardPage() {
           </div>
         </div>
 
+        {/* MAL Connection Section */}
+        <div className="mb-8">
+          <MALConnect />
+        </div>
+
         {/* Quick actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button className="bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 text-white font-semibold py-3 px-4 rounded-lg transition">
@@ -60,7 +62,7 @@ export default async function DashboardPage() {
         {/* Coming soon section */}
         <div className="mt-8 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
           <p className="text-yellow-400 text-sm">
-            ⚡ Coming soon: Connect your MyAnimeList account to play personalized quizzes!
+            ⚡ Lobby creation and game rooms coming soon! Connect your MAL account to get personalized quizzes.
           </p>
         </div>
       </div>
