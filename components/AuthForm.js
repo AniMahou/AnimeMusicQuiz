@@ -22,21 +22,24 @@ export default function AuthForm({ mode = 'login' }) {
     setLoading(true);
 
     if (isLogin) {
-      // LOGIN
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError('Invalid email or password');
-        setLoading(false);
-      } else {
-        router.push('/dashboard');
-        router.refresh();
-      }
-    } else{
+        // LOGIN
+        console.log('Logging in with:', email);
+        const result = await signIn('credentials', {
+          email,
+          password,
+          redirect: false,
+        });
+      
+        console.log('Login result:', result);
+      
+        if (result?.error) {
+          setError('Invalid email or password');
+          setLoading(false);
+        } else {
+          router.push('/dashboard');
+          router.refresh();
+        }
+      } else{
         try {
             console.log('Registering user...');
             const response = await fetch('/api/auth/register', {
