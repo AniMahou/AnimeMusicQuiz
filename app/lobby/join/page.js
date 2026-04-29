@@ -3,17 +3,27 @@
 
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
-export default function JoinLobbyPage() {
+// Inner component that uses useSearchParams
+function JoinLobbyForm() {
   const { status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
+  
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Auto-fill code from URL parameter
+  useEffect(() => {
+    const codeParam = searchParams.get('code');
+    if (codeParam) {
+      setCode(codeParam.toUpperCase());
+    }
+  }, [searchParams]);
   
   // Redirect if not logged in
   if (status === 'unauthenticated') {
@@ -71,7 +81,6 @@ export default function JoinLobbyPage() {
     <main className="max-w-md mx-auto px-4 py-12">
       <div className="bg-white/5 backdrop-blur-sm rounded-xl p-8 border border-white/10">
         
-        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-pink-500 bg-clip-text text-transparent mb-2">
             Join Lobby
@@ -81,14 +90,12 @@ export default function JoinLobbyPage() {
           </p>
         </div>
         
-        {/* Error Message */}
         {error && (
           <div className="mb-6 p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
             <p className="text-red-400 text-sm">{error}</p>
           </div>
         )}
         
-        {/* Join Form */}
         <form onSubmit={handleJoinLobby} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -117,7 +124,6 @@ export default function JoinLobbyPage() {
           </button>
         </form>
         
-        {/* Back Button */}
         <div className="mt-6 text-center">
           <button
             onClick={() => router.push('/dashboard')}
@@ -127,7 +133,6 @@ export default function JoinLobbyPage() {
           </button>
         </div>
         
-        {/* Info Box */}
         <div className="mt-6 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
           <p className="text-sm text-blue-400">
             💡 Don't have a code? Ask a friend to create a lobby and share the code with you!
@@ -136,5 +141,18 @@ export default function JoinLobbyPage() {
         
       </div>
     </main>
+  );
+}
+
+// Main component with Suspense boundary
+export default function JoinLobbyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+      </div>
+    }>
+      <JoinLobbyForm />
+    </Suspense>
   );
 }

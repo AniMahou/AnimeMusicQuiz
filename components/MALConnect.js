@@ -19,7 +19,7 @@ export default function MALConnect() {
     setSyncStatus('');
     
     try {
-      await signIn('mal', { callbackUrl: '/dashboard' });
+      await signIn('mal');
     } catch (error) {
       console.error('MAL connection error:', error);
       setSyncStatus('Failed to connect MAL');
