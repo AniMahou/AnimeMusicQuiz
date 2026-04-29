@@ -36,41 +36,49 @@ export default function AuthForm({ mode = 'login' }) {
         router.push('/dashboard');
         router.refresh();
       }
-    } else {
-      // REGISTER - Create account with Supabase first
-      try {
-        const response = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, name }),
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.error || 'Registration failed');
-        }
-        
-        // Auto-login after registration
-        const loginResult = await signIn('credentials', {
-          email,
-          password,
-          redirect: false,
-        });
-        
-        if (loginResult?.error) {
-          setError('Account created! Please login.');
-          router.push('/login');
-        } else {
-          router.push('/dashboard');
-          router.refresh();
-        }
-      } catch (err) {
-        setError(err.message);
-        setLoading(false);
-      }
+    } else{
+        try {
+            console.log('Registering user...');
+            const response = await fetch('/api/auth/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, password, name }),
+            });
+            
+            const data = await response.json();
+            console.log('Register response:', data);
+            
+            if (!response.ok) {
+              throw new Error(data.error || 'Registration failed');
+            }
+            
+            // Wait a moment for Supabase to process
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Now login
+            console.log('Logging in...');
+            const loginResult = await signIn('credentials', {
+              email,
+              password,
+              redirect: false,
+            });
+            
+            console.log('Login result:', loginResult);
+            
+            if (loginResult?.error) {
+              setError('Account created! Please login manually.');
+              router.push('/login');
+            } else {
+              router.push('/dashboard');
+              router.refresh();
+            }
+          } catch (err) {
+            console.error('Registration error:', err);
+            setError(err.message);
+            setLoading(false);
+          }
+        }        
     }
-  };
 
   const handleSocialLogin = (provider) => {
     signIn(provider, { callbackUrl: '/dashboard' });
